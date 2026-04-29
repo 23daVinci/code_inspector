@@ -39,5 +39,5 @@ async def run_agent(pr_url: str):
 
 
 if __name__ == "__main__":
-    asyncio.run(run_agent("https://github.com/23daVinci/ANLI-Classifier/pull/10"))
+    asyncio.run(run_agent("https://github.com/23daVinci/code_inspector/pull/3"))
 

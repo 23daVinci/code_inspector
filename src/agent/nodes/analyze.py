@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
+from langsmith import traceable
 
 from models import AgentState, Finding
 from prompts import ANALYZER_PROMPT

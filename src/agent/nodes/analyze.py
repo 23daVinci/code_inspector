@@ -8,8 +8,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from langsmith import traceable
 
-from models import AgentState, Finding
-from prompts import ANALYZER_PROMPT
+from agent.models import AgentState, Finding
+from agent.prompts import ANALYZER_PROMPT
 
 ENV_FILE_PATH = Path(__file__).parents[3] / ".env"
 load_dotenv(ENV_FILE_PATH)

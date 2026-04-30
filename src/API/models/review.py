@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Literal
 
+
 class ReviewRequest(BaseModel):
     pr_url: str
 
@@ -8,3 +9,7 @@ class ReviewRequest(BaseModel):
 class ReviewResponse(BaseModel):
     job_id: str
     status: Literal["running", "awaiting_approval", "done", "error"]
+
+
+class DecisionRequest(BaseModel):
+    decision: Literal["approved", "rejected"]

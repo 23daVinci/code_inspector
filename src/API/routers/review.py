@@ -1,22 +1,34 @@
 import uuid
 import asyncio
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from API.models import ReviewRequest, ReviewResponse, Job
-from agent.graph import run_agent
+from API.models import ReviewRequest, ReviewResponse, DecisionRequest, Job
+from agent.graph import CodeInspectorAgent
+
 
 router = APIRouter(prefix="/v1", tags=["review"])
+agent = CodeInspectorAgent()
+
+# In-memory job store — replace with Redis or a DB for multi-process deployments
+_jobs: dict[str, Job] = {}
 
 
-@router.post("/review", response_model=ReviewResponse)
-async def create_review(body: ReviewRequest):
-    job_id = str(uuid.uuid4())[:6]
-    job = Job(id=job_id, status="running")
+# ── Background task helpers ────────────────────────────────────────────────────
 
-    config = {"configurable": {"thread_id": job.id}}
-    
-    asyncio.create_task(run_agent(pr_url=body.pr_url, config=config))
-    return ReviewResponse(
-                            job_id=job.id,
-                            status=job.status,
-                        )
+async def _run_review(job_id: str, pr_url: str) -> None:
+    config = {"configurable": {"thread_id": job_id}}
+    try:
+        result = await agent.run(pr_url=pr_url, config=config)
+        _jobs[job_id] = Job(id=job_id, status="awaiting_approval")
+    except Exception as e:
+        _jobs[job_id] = Job(id=job_id, status="error", error=str(e))
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────────
+
+@router.post("/review", response_model=ReviewResponse, status_code=202)
+async def create_review(body: ReviewRequest) -> ReviewResponse:
+    job_id = str(uuid.uuid4())[:8]
+    _jobs[job_id] = Job(id=job_id, status="running")
+    asyncio.create_task(_run_review(job_id, body.pr_url))
+    return ReviewResponse(job_id=job_id, status="running")

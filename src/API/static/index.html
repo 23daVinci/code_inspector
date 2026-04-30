@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Code Inspector</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #f6f8fa;
+      --surface:   #ffffff;
+      --border:    #d0d7de;
+      --text:      #1f2328;
+      --muted:     #656d76;
+      --accent:    #1a7f37;
+      --accent-hover: #116329;
+      --danger:    #cf222e;
+      --danger-hover: #a40e26;
+      --warning:   #9a6700;
+      --info:      #0969da;
+      --high:      #cf222e;
+      --medium:    #9a6700;
+      --low:       #0550ae;
+      --radius:    8px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px;
+    }
+
+    .container { width: 100%; max-width: 760px; }
+
+    /* ── Header ── */
+    header { text-align: center; margin-bottom: 40px; }
+    header h1 { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.5px; }
+    header p  { color: var(--muted); margin-top: 6px; font-size: 0.95rem; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    /* ── Input form ── */
+    .input-row { display: flex; gap: 10px; }
+    input[type="text"] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="text"]:focus { border-color: var(--info); }
+    input[type="text"]::placeholder { color: var(--muted); }
+    input[type="text"]:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Buttons ── */
+    button {
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      padding: 10px 18px;
+      transition: background 0.15s, opacity 0.15s;
+      white-space: nowrap;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-primary  { background: var(--accent);  color: #fff; }
+    .btn-primary:not(:disabled):hover  { background: var(--accent-hover); }
+    .btn-danger   { background: var(--danger);  color: #fff; }
+    .btn-danger:not(:disabled):hover   { background: var(--danger-hover); }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-ghost:not(:disabled):hover { background: var(--border); }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+    .status-bar .job-id { font-family: monospace; color: var(--muted); }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--info);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-green  { background: var(--accent); }
+    .dot-yellow { background: var(--warning); }
+    .dot-red    { background: var(--danger); }
+
+    /* ── Findings list ── */
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .finding {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 8px 12px;
+      align-items: start;
+    }
+    .finding:last-child { margin-bottom: 0; }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.04em;
+      margin-top: 2px;
+    }
+    .badge-high   { background: #ffebe9; color: var(--high); }
+    .badge-medium { background: #fff8c5; color: var(--medium); }
+    .badge-low    { background: #ddf4ff; color: var(--low); }
+
+    .finding-body { min-width: 0; }
+    .finding-location { font-family: monospace; font-size: 0.8rem; color: var(--muted); margin-bottom: 3px; }
+    .finding-desc { font-size: 0.875rem; line-height: 1.45; }
+    .finding-confidence { font-size: 0.75rem; color: var(--muted); text-align: right; margin-top: 2px; }
+
+    .no-findings {
+      text-align: center;
+      color: var(--accent);
+      padding: 16px;
+      font-size: 0.9rem;
+    }
+
+    /* ── Approval actions ── */
+    .approval-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .approval-actions p {
+      flex: 1;
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .approval-buttons { display: flex; gap: 8px; flex-shrink: 0; }
+
+    /* ── Rendered comment ── */
+    .comment-preview {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-size: 0.875rem;
+      line-height: 1.6;
+    }
+    .comment-preview h2 { font-size: 1.1rem; margin-bottom: 8px; }
+    .comment-preview h3 { font-size: 0.95rem; margin: 14px 0 6px; }
+    .comment-preview p  { margin-bottom: 8px; }
+    .comment-preview hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+    .comment-preview code {
+      background: #eaeef2;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: monospace;
+    }
+    .comment-preview blockquote {
+      border-left: 3px solid var(--border);
+      padding-left: 12px;
+      color: var(--muted);
+      margin: 6px 0;
+    }
+    .comment-preview em { color: var(--muted); font-style: italic; }
+    .comment-preview strong { font-weight: 600; }
+
+    /* ── Error ── */
+    .error-box {
+      background: #ffebe9;
+      border: 1px solid #ffcecb;
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 0.875rem;
+      color: var(--high);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ── Reset link ── */
+    .reset-row { text-align: center; margin-top: 8px; }
+    .reset-link {
+      background: none; border: none;
+      color: var(--muted); font-size: 0.85rem;
+      cursor: pointer; text-decoration: underline;
+    }
+    .reset-link:hover { color: var(--text); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <h1>Code Inspector</h1>
+      <p>Automated security review for GitHub Pull Requests</p>
+    </header>
+
+    <!-- Input -->
+    <div class="card" id="input-card">
+      <div class="input-row">
+        <input
+          type="text"
+          id="pr-url"
+          placeholder="https://github.com/owner/repo/pull/123"
+          autocomplete="off"
+        />
+        <button class="btn-primary" id="analyze-btn" onclick="startReview()">Analyze PR</button>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="card hidden" id="status-card">
+      <div class="status-bar" id="status-bar"></div>
+    </div>
+
+    <!-- Findings + approval -->
+    <div class="card hidden" id="approval-card">
+      <div class="section-label">Findings</div>
+      <div id="findings-list"></div>
+      <div class="approval-actions">
+        <p>Review the findings above. Approve to post this comment to the PR, or reject to discard.</p>
+        <div class="approval-buttons">
+          <button class="btn-ghost" id="reject-btn" onclick="submitDecision('rejected')">Reject</button>
+          <button class="btn-primary" id="approve-btn" onclick="submitDecision('approved')">Approve &amp; Post</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="card hidden" id="result-card">
+      <div class="section-label">Posted Comment Preview</div>
+      <div class="comment-preview" id="comment-body"></div>
+    </div>
+
+    <!-- Error -->
+    <div class="card hidden" id="error-card">
+      <div class="error-box">
+        <span>⚠</span>
+        <span id="error-message"></span>
+      </div>
+    </div>
+
+    <!-- Reset -->
+    <div class="reset-row hidden" id="reset-row">
+      <button class="reset-link" onclick="resetUI()">Start a new review</button>
+    </div>
+
+  </div>
+
+  <script>
+    let jobId = null;
+    let pollTimer = null;
+
+    // ── Entry point ──────────────────────────────────────────────────────────
+
+    async function startReview() {
+      const url = document.getElementById('pr-url').value.trim();
+      if (!url) return;
+
+      setFormDisabled(true);
+      hideAll();
+      showStatusCard('running', 'Submitting…');
+
+      try {
+        const res = await fetch('/v1/review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pr_url: url }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        jobId = data.job_id;
+        showStatusCard('running', `Analyzing PR · job <span class="job-id">${jobId}</span>`);
+        pollTimer = setInterval(poll, 2000);
+      } catch (e) {
+        showError(e.message);
+        setFormDisabled(false);
+      }
+    }
+
+    // ── Polling ──────────────────────────────────────────────────────────────
+
+    async function poll() {
+      try {
+        const res = await fetch(`/v1/review/${jobId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const job = await res.json();
+
+        if (job.status === 'running') return; // keep polling
+
+        clearInterval(pollTimer);
+
+        if (job.status === 'awaiting_approval') onAwaitingApproval(job);
+        else if (job.status === 'done')         onDone(job);
+        else if (job.status === 'error')        showError(job.error || 'Unknown error');
+      } catch (e) {
+        clearInterval(pollTimer);
+        showError(e.message);
+      }
+    }
+
+    // ── Decision ─────────────────────────────────────────────────────────────
+
+    async function submitDecision(decision) {
+      setDecisionDisabled(true);
+      hideAll();
+      showStatusCard('running', `${decision === 'approved' ? 'Posting comment…' : 'Rejecting…'}`);
+
+      try {
+        const res = await fetch(`/v1/review/${jobId}/decision`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        pollTimer = setInterval(poll, 2000);
+      } catch (e) {
+        showError(e.message);
+      }
+    }
+
+    // ── State renderers ──────────────────────────────────────────────────────
+
+    function onAwaitingApproval(job) {
+      document.getElementById('status-card').classList.add('hidden');
+
+      const findings = job.state?.findings ?? [];
+      renderFindings(findings);
+      document.getElementById('approval-card').classList.remove('hidden');
+    }
+
+    function onDone(job) {
+      document.getElementById('status-card').classList.add('hidden');
+
+      const commentBody = job.state?.comment_body;
+      if (commentBody) {
+        document.getElementById('comment-body').innerHTML = marked.parse(commentBody);
+        document.getElementById('result-card').classList.remove('hidden');
+      } else {
+        showStatusCard('done', 'Review complete — comment posted.');
+      }
+      document.getElementById('reset-row').classList.remove('hidden');
+    }
+
+    function renderFindings(findings) {
+      const list = document.getElementById('findings-list');
+      if (!findings.length) {
+        list.innerHTML = '<div class="no-findings">✅ No security issues found in the changed lines.</div>';
+        return;
+      }
+      const order = { high: 0, medium: 1, low: 2 };
+      findings
+        .slice()
+        .sort((a, b) => order[a.severity] - order[b.severity])
+        .forEach(f => {
+          const pct = Math.round((f.confidence ?? 0) * 100);
+          list.insertAdjacentHTML('beforeend', `
+            <div class="finding">
+              <span class="badge badge-${f.severity}">${f.severity}</span>
+              <div class="finding-body">
+                <div class="finding-location">${escHtml(f.file)} · line ${f.line}</div>
+                <div class="finding-desc">${escHtml(f.description)}</div>
+              </div>
+              <div class="finding-confidence">${pct}%</div>
+            </div>
+          `);
+        });
+    }
+
+    // ── UI helpers ───────────────────────────────────────────────────────────
+
+    function showStatusCard(type, html) {
+      const card = document.getElementById('status-card');
+      const bar  = document.getElementById('status-bar');
+      card.classList.remove('hidden');
+
+      const icons = {
+        running: '<div class="spinner"></div>',
+        done:    '<div class="dot dot-green"></div>',
+        error:   '<div class="dot dot-red"></div>',
+      };
+      bar.innerHTML = `${icons[type] ?? ''} <span>${html}</span>`;
+    }
+
+    function showError(msg) {
+      document.getElementById('status-card').classList.add('hidden');
+      document.getElementById('error-message').textContent = msg;
+      document.getElementById('error-card').classList.remove('hidden');
+      document.getElementById('reset-row').classList.remove('hidden');
+    }
+
+    function hideAll() {
+      ['approval-card', 'result-card', 'error-card', 'reset-row'].forEach(id =>
+        document.getElementById(id).classList.add('hidden')
+      );
+      document.getElementById('findings-list').innerHTML = '';
+    }
+
+    function setFormDisabled(disabled) {
+      document.getElementById('pr-url').disabled = disabled;
+      document.getElementById('analyze-btn').disabled = disabled;
+    }
+
+    function setDecisionDisabled(disabled) {
+      document.getElementById('approve-btn').disabled = disabled;
+      document.getElementById('reject-btn').disabled = disabled;
+    }
+
+    function resetUI() {
+      clearInterval(pollTimer);
+      jobId = null;
+      hideAll();
+      document.getElementById('status-card').classList.add('hidden');
+      document.getElementById('pr-url').value = '';
+      setFormDisabled(false);
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Submit on Enter
+    document.getElementById('pr-url').addEventListener('keydown', e => {
+      if (e.key === 'Enter') startReview();
+    });
+  </script>
+</body>
+</html>

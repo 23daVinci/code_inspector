@@ -19,7 +19,7 @@ async def _run_review(job_id: str, pr_url: str) -> None:
     config = {"configurable": {"thread_id": job_id}}
     try:
         result = await agent.run(pr_url=pr_url, config=config)
-        _jobs[job_id] = Job(id=job_id, status="awaiting_approval")
+        _jobs[job_id] = Job(id=job_id, status="awaiting_approval", state=result)
     except Exception as e:
         _jobs[job_id] = Job(id=job_id, status="error", error=str(e))
 

@@ -1,8 +1,8 @@
 import os
 import httpx
 
-from models import AgentState
-from utils import parse_pr_url
+from agent.models import AgentState
+from agent.utils import parse_pr_url
 
 GITHUB_API = "https://api.github.com"
 

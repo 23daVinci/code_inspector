@@ -2,8 +2,8 @@ from pydantic import BaseModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from prompts import REFLECTION_PROMPT
-from models import AgentState
+from agent.prompts import REFLECTION_PROMPT
+from agent.models import AgentState
 
 
 # ── Output schema ──────────────────────────────────────────────────────────────

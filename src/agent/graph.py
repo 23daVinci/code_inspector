@@ -3,8 +3,8 @@ import json
 from langsmith import traceable
 from langgraph.graph import StateGraph, START, END
 
-from models import AgentState
-from nodes import fetch_pr, analyze, reflect, format_comment, post_comment
+from agent.models import AgentState
+from agent.nodes import fetch_pr, analyze, reflect, format_comment, post_comment
 
 
 def create_agent():
@@ -31,13 +31,13 @@ def create_agent():
     return graph.compile()
 
 
-async def run_agent(pr_url: str):
+async def run_agent(pr_url: str, config: dict):
     compiled = create_agent()
-    result = await compiled.ainvoke({"pr_url": pr_url})
-    print(json.dumps(result, indent=4))
+    result = await compiled.ainvoke({"pr_url": pr_url}, config)
     
 
 
 if __name__ == "__main__":
-    asyncio.run(run_agent("https://github.com/23daVinci/code_inspector/pull/3"))
+    asyncio.run(run_agent("https://github.com/23daVinci/code_inspector/pull/3",
+                          {"configurable": {"thread_id": "1"}}))
 

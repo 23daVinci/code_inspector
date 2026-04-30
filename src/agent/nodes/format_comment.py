@@ -1,4 +1,4 @@
-from models import AgentState
+from agent.models import AgentState
 
 # ── Severity config ────────────────────────────────────────────────────────────
 

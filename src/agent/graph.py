@@ -4,6 +4,7 @@ from langsmith import traceable
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from typing import Literal
 
 from agent.models import AgentState
 from agent.nodes import fetch_pr, analyze, reflect, format_comment, post_comment
@@ -12,13 +13,12 @@ from agent.nodes import fetch_pr, analyze, reflect, format_comment, post_comment
 class CodeInspectorAgent:
 
 
-    """
-    Private method to create the agent's state graph and compile it with a checkpointer.
-     - The graph defines the flow of operations for the agent, starting from fetching the PR to posting the comment.
-     - Conditional edges are used to determine the next steps based on the analysis results and reflection outcomes.
-     - The compiled graph is returned, ready to be invoked with specific inputs and configurations.
-    """
     def _create_agent(self, checkpointer: BaseCheckpointSaver):
+        """
+        Private method to create the agent's state graph and compile it with the provided checkpointer for state management.
+         - The graph defines the flow of operations from fetching the PR to posting the comment, with conditional logic for analysis and reflection.
+         - The compiled graph can then be invoked with the initial state and configuration.
+        """
         graph = StateGraph(AgentState)
 
         graph.add_node("fetch_pr", fetch_pr)
@@ -42,14 +42,27 @@ class CodeInspectorAgent:
         return graph.compile(checkpointer)
 
 
-    """
-    Public method to run the agent with a given PR URL and configuration.
-     - An asynchronous context is created for the checkpointer to manage state persistence.
-    """
     async def run(self, pr_url: str, config: dict):
+        """
+        Public method to run the agent with a given PR URL and configuration.
+        - An asynchronous context is created for the checkpointer to manage state persistence.
+        """
         async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
             compiled = self._create_agent(checkpointer)
-            result = await compiled.ainvoke({"pr_url": pr_url}, config)
+            return await compiled.ainvoke({"pr_url": pr_url}, config)
+        
+
+    async def resume(self, decision: Literal["approved", "rejected"], config: dict) -> dict | None:
+        """
+        Resume the agent after an interrupt with the user's decision.
+        """
+        async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
+            compiled = self._create_agent(checkpointer)
+            
+            if decision == "approved":
+                return await compiled.ainvoke(None, config)
+            else:
+                return None
 
 
 

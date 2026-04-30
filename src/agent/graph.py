@@ -2,12 +2,14 @@ import asyncio
 import json
 from langsmith import traceable
 from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from models import AgentState
 from nodes import fetch_pr, analyze, reflect, format_comment, post_comment
 
 
 def create_agent():
+    checkpointer = MemorySaver()
     graph = StateGraph(AgentState)
 
     graph.add_node("fetch_pr", fetch_pr)
@@ -28,12 +30,13 @@ def create_agent():
     graph.add_edge("format_comment", "post_comment")
     graph.add_edge("post_comment", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer)
 
 
 async def run_agent(pr_url: str):
     compiled = create_agent()
-    result = await compiled.ainvoke({"pr_url": pr_url})
+    config = {"configurable": {"thread_id": "1"}}
+    result = await compiled.ainvoke({"pr_url": pr_url}, config)
     print(json.dumps(result, indent=4))
     
 

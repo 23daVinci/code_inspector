@@ -9,7 +9,3 @@ class ReviewRequest(BaseModel):
 class ReviewResponse(BaseModel):
     job_id: str
     status: Literal["running", "awaiting_approval", "done", "error"]
-
-
-class DecisionRequest(BaseModel):
-    decision: Literal["approved", "rejected"]

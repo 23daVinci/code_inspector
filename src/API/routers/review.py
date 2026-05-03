@@ -1,8 +1,8 @@
 import uuid
 import asyncio
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, status
 
-from API.models import ReviewRequest, ReviewResponse, DecisionRequest, Job
+from API.models import ReviewRequest, ReviewResponse, Job
 from agent.graph import CodeInspectorAgent
 
 
@@ -26,7 +26,8 @@ async def _run_review(job_id: str, pr_url: str) -> None:
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
-@router.post("/review", response_model=ReviewResponse, status_code=202)
+@router.post("/review", response_model=ReviewResponse, 
+             status_code=status.HTTP_202_ACCEPTED)
 async def create_review(body: ReviewRequest) -> ReviewResponse:
     job_id = str(uuid.uuid4())[:8]
     _jobs[job_id] = Job(id=job_id, status="running")

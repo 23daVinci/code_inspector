@@ -49,7 +49,9 @@ class CodeInspectorAgent:
         """
         async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
             compiled = self._create_agent(checkpointer)
-            return await compiled.ainvoke({"pr_url": pr_url}, config)
+            #return await compiled.ainvoke({"pr_url": pr_url}, config)
+            async for update in compiled.astream({"pr_url": pr_url}, config):
+                print(update)
         
 
     async def resume(self, decision: Literal["approved", "rejected"], config: dict) -> dict | None:

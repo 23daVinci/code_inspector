@@ -1,2 +1,2 @@
-from .review import ReviewRequest, ReviewResponse
+from .review import ReviewRequest, ReviewResponse, DecisionRequest
 from .job import Job

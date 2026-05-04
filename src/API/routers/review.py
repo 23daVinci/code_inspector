@@ -19,8 +19,16 @@ _queues: dict[str, asyncio.Queue] = {}
 # ── Background task helpers ────────────────────────────────────────────────────
 
 async def _run_review(job_id: str, pr_url: str) -> None:
+    """
+    Runs the code review process in the background, streaming events to the queue.
+
+    @param job_id: Unique identifier for the review job
+    @param pr_url: URL of the pull request to review
+    """
+
     config = {"configurable": {"thread_id": job_id}}
     queue = _queues[job_id]
+
     try:
         async for event in agent.stream_events(pr_url=pr_url, config=config):
             await queue.put(event)
@@ -46,8 +54,12 @@ async def create_review(body: ReviewRequest) -> ReviewResponse:
     job_id = str(uuid.uuid4())[:8]
     _jobs[job_id] = Job(id=job_id, status="running")
     _queues[job_id] = asyncio.Queue()
+
     asyncio.create_task(_run_review(job_id, body.pr_url))
+
     return ReviewResponse(job_id=job_id, status="running")
+
+
 
 
 @router.get("/review/{job_id}/stream")

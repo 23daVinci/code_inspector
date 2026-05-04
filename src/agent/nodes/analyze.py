@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from pathlib import Path
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
-from langsmith import traceable
 
 from agent.models import AgentState, Finding
 from agent.prompts import ANALYZER_PROMPT
@@ -64,7 +63,7 @@ async def analyze(state: AgentState) -> dict:
     response: SecurityReview = await structured_model.ainvoke(messages)
 
     return {
-        "findings": state.get("findings", []) + response.findings,
+        "findings": state.get("findings", []) + [f.model_dump() for f in response.findings],
         "loop_count": state.get("loop_count", 0) + 1,
     }
 

@@ -52,6 +52,22 @@ class CodeInspectorAgent:
             return await compiled.ainvoke({"pr_url": pr_url}, config)
         
 
+    _NODE_NAMES = {"fetch_pr", "analyze", "reflect", "format_comment", "post_comment"}
+
+    async def stream_events(self, pr_url: str, config: dict):
+        """
+        Async generator that yields a slim dict for each node completion.
+        Yields: {"node": str, "status": "completed"} for each node,
+        then a terminal {"status": "awaiting_approval"} when the graph finishes.
+        """
+        async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
+            compiled = self._create_agent(checkpointer)
+            async for event in compiled.astream_events({"pr_url": pr_url}, config, version="v2"):
+                if event["event"] == "on_chain_end" and event["name"] in self._NODE_NAMES:
+                    yield {"node": event["name"], "status": "completed"}
+            yield {"status": "awaiting_approval"}
+
+
     async def resume(self, decision: Literal["approved", "rejected"], config: dict) -> dict | None:
         """
         Resume the agent after an interrupt with the user's decision.

@@ -2,7 +2,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from API.routers import health, review
+from API.routers import review
 
 STATIC_DIR = Path(__file__).parent / "static"
 

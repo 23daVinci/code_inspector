@@ -123,6 +123,59 @@
     .dot-yellow { background: var(--warning); }
     .dot-red    { background: var(--danger); }
 
+    /* ── Node progress stepper ── */
+    .progress-steps {
+      list-style: none;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 5px 0;
+      font-size: 0.875rem;
+    }
+
+    .step-icon {
+      width: 20px; height: 20px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .step-pending .step-label { color: var(--muted); }
+    .step-active  .step-label { color: var(--text); font-weight: 500; }
+    .step-done    .step-label { color: var(--text); }
+
+    .step-mini-spinner {
+      width: 13px; height: 13px;
+      border: 2px solid var(--border);
+      border-top-color: var(--info);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .step-pending-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      margin: 0 2px;
+    }
+
+    .step-check {
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
     /* ── Findings list ── */
     .section-label {
       font-size: 0.75rem;
@@ -261,9 +314,10 @@
       </div>
     </div>
 
-    <!-- Status -->
+    <!-- Status + node progress -->
     <div class="card hidden" id="status-card">
       <div class="status-bar" id="status-bar"></div>
+      <ul class="progress-steps hidden" id="progress-steps"></ul>
     </div>
 
     <!-- Findings + approval -->
@@ -288,7 +342,7 @@
     <!-- Error -->
     <div class="card hidden" id="error-card">
       <div class="error-box">
-        <span>⚠</span>
+        <span>&#9888;</span>
         <span id="error-message"></span>
       </div>
     </div>
@@ -302,7 +356,15 @@
 
   <script>
     let jobId = null;
-    let pollTimer = null;
+    let eventSource = null;
+
+    const NODES = [
+      { id: 'fetch_pr',       label: 'Fetching PR data' },
+      { id: 'analyze',        label: 'Analyzing code' },
+      { id: 'reflect',        label: 'Reflecting on findings' },
+      { id: 'format_comment', label: 'Formatting review' },
+      { id: 'post_comment',   label: 'Posting comment' },
+    ];
 
     // ── Entry point ──────────────────────────────────────────────────────────
 
@@ -327,31 +389,82 @@
         const data = await res.json();
         jobId = data.job_id;
         showStatusCard('running', `Analyzing PR · job <span class="job-id">${jobId}</span>`);
-        pollTimer = setInterval(poll, 2000);
+        renderSteps();
+        openStream(jobId);
       } catch (e) {
         showError(e.message);
         setFormDisabled(false);
       }
     }
 
-    // ── Polling ──────────────────────────────────────────────────────────────
+    // ── SSE stream ───────────────────────────────────────────────────────────
 
-    async function poll() {
-      try {
-        const res = await fetch(`/v1/review/${jobId}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const job = await res.json();
+    function openStream(id) {
+      eventSource = new EventSource(`/v1/review/${id}/stream`);
 
-        if (job.status === 'running') return; // keep polling
+      eventSource.onmessage = (e) => {
+        const event = JSON.parse(e.data);
 
-        clearInterval(pollTimer);
+        if (event.node && event.status === 'completed') {
+          markNodeDone(event.node);
+        } else if (event.status === 'awaiting_approval') {
+          eventSource.close();
+          eventSource = null;
+          fetch(`/v1/review/${id}`)
+            .then(r => r.json())
+            .then(job => onAwaitingApproval(job))
+            .catch(err => showError(err.message));
+        } else if (event.status === 'error') {
+          eventSource.close();
+          eventSource = null;
+          showError(event.error || 'Unknown error');
+        }
+      };
 
-        if (job.status === 'awaiting_approval') onAwaitingApproval(job);
-        else if (job.status === 'done')         onDone(job);
-        else if (job.status === 'error')        showError(job.error || 'Unknown error');
-      } catch (e) {
-        clearInterval(pollTimer);
-        showError(e.message);
+      eventSource.onerror = () => {
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+        showError('Connection lost');
+      };
+    }
+
+    // ── Node stepper ─────────────────────────────────────────────────────────
+
+    function renderSteps() {
+      const list = document.getElementById('progress-steps');
+      list.innerHTML = '';
+      NODES.forEach(n => {
+        const li = document.createElement('li');
+        li.id = `step-${n.id}`;
+        li.className = 'step step-pending';
+        li.innerHTML = `
+          <span class="step-icon"><span class="step-pending-dot"></span></span>
+          <span class="step-label">${n.label}</span>
+        `;
+        list.appendChild(li);
+      });
+      list.classList.remove('hidden');
+      setStepActive(NODES[0].id);
+    }
+
+    function setStepActive(nodeId) {
+      const el = document.getElementById(`step-${nodeId}`);
+      if (!el) return;
+      el.className = 'step step-active';
+      el.querySelector('.step-icon').innerHTML = '<span class="step-mini-spinner"></span>';
+    }
+
+    function markNodeDone(nodeId) {
+      const el = document.getElementById(`step-${nodeId}`);
+      if (!el) return;
+      el.className = 'step step-done';
+      el.querySelector('.step-icon').innerHTML = '<span class="step-check">&#10003;</span>';
+
+      const idx = NODES.findIndex(n => n.id === nodeId);
+      if (idx !== -1 && idx + 1 < NODES.length) {
+        setStepActive(NODES[idx + 1].id);
       }
     }
 
@@ -360,7 +473,7 @@
     async function submitDecision(decision) {
       setDecisionDisabled(true);
       hideAll();
-      showStatusCard('running', `${decision === 'approved' ? 'Posting comment…' : 'Rejecting…'}`);
+      showStatusCard('running', decision === 'approved' ? 'Posting comment…' : 'Rejecting…');
 
       try {
         const res = await fetch(`/v1/review/${jobId}/decision`, {
@@ -372,7 +485,8 @@
           const err = await res.json().catch(() => ({}));
           throw new Error(err.detail || `HTTP ${res.status}`);
         }
-        pollTimer = setInterval(poll, 2000);
+        const job = await fetch(`/v1/review/${jobId}`).then(r => r.json());
+        onDone(job);
       } catch (e) {
         showError(e.message);
       }
@@ -396,7 +510,7 @@
         document.getElementById('comment-body').innerHTML = marked.parse(commentBody);
         document.getElementById('result-card').classList.remove('hidden');
       } else {
-        showStatusCard('done', 'Review complete — comment posted.');
+        showStatusCard('done', 'Review complete.');
       }
       document.getElementById('reset-row').classList.remove('hidden');
     }
@@ -404,7 +518,7 @@
     function renderFindings(findings) {
       const list = document.getElementById('findings-list');
       if (!findings.length) {
-        list.innerHTML = '<div class="no-findings">✅ No security issues found in the changed lines.</div>';
+        list.innerHTML = '<div class="no-findings">&#10003; No security issues found in the changed lines.</div>';
         return;
       }
       const order = { high: 0, medium: 1, low: 2 };
@@ -466,10 +580,11 @@
     }
 
     function resetUI() {
-      clearInterval(pollTimer);
+      if (eventSource) { eventSource.close(); eventSource = null; }
       jobId = null;
       hideAll();
       document.getElementById('status-card').classList.add('hidden');
+      document.getElementById('progress-steps').classList.add('hidden');
       document.getElementById('pr-url').value = '';
       setFormDisabled(false);
     }

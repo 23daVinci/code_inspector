@@ -21,6 +21,9 @@ class AgentState(TypedDict):
     diff: str
     pr_metadata: dict
 
+    cve_data: list[dict]        # populated by osv_lookup
+    owasp_mappings: list[dict]  # populated by owasp_classify
+
     # LLM conversation history (auto-merges via reducer)
     messages: Annotated[list, add_messages]
 

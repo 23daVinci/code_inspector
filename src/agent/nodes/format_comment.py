@@ -13,12 +13,12 @@ SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 # ── Node ───────────────────────────────────────────────────────────────────────
 
 def format_comment(state: AgentState) -> dict:
-    findings = sorted(state["findings"], key=lambda f: SEVERITY_ORDER[f.severity])
+    findings = sorted(state["findings"], key=lambda f: SEVERITY_ORDER[f["severity"]])
     meta = state["pr_metadata"]
 
-    high   = [f for f in findings if f.severity == "high"]
-    medium = [f for f in findings if f.severity == "medium"]
-    low    = [f for f in findings if f.severity == "low"]
+    high   = [f for f in findings if f["severity"] == "high"]
+    medium = [f for f in findings if f["severity"] == "medium"]
+    low    = [f for f in findings if f["severity"] == "low"]
 
     sections = [_header(meta, findings)]
 
@@ -40,7 +40,7 @@ def format_comment(state: AgentState) -> dict:
 
 def _header(meta: dict, findings: list) -> str:
     total = len(findings)
-    high  = sum(1 for f in findings if f.severity == "high")
+    high  = sum(1 for f in findings if f["severity"] == "high")
     status = "⚠️ Issues found" if findings else "✅ Clean"
 
     return f"""## 🔍 Automated Security Review
@@ -56,9 +56,9 @@ def _section(title: str, severity: str, findings: list) -> str:
     lines = [f"### {emoji} {title}"]
 
     for f in findings:
-        confidence_pct = int(f.confidence * 100)
-        lines.append(f"""**`{f.file}`** — line {f.line}
-> {f.description}
+        confidence_pct = int(f["confidence"] * 100)
+        lines.append(f"""**`{f["file"]}`** — line {f["line"]}
+> {f["description"]}
 *Confidence: {confidence_pct}%*""")
 
     return "\n\n".join(lines)

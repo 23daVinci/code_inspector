@@ -1,3 +1,9 @@
+"""
+Node to fetch PR metadata and diff from GitHub API.
+
+This is the first node in the graph, responsible for populating the initial state with PR data."""
+
+
 import re
 import httpx
 

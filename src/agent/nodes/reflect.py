@@ -28,8 +28,8 @@ structured_model = llm.with_structured_output(Reflection)
 
 async def reflect(state: AgentState) -> dict:
     findings_summary = "\n".join([
-        f"- [{f.severity.upper()}] {f.file} line {f.line}: {f.description} "
-        f"(confidence: {f.confidence})"
+        f"- [{f['severity'].upper()}] {f['file']} line {f['line']}: {f['description']} "
+        f"(confidence: {f['confidence']})"
         for f in state["findings"]
     ])
 

@@ -7,7 +7,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from typing import Literal
 
 from agent.models import AgentState
-from agent.nodes import fetch_pr, analyze, reflect, format_comment, post_comment
+from agent.nodes import fetch_pr, analyze, reflect, format_comment, post_comment, owasp_classify
 
 
 class CodeInspectorAgent:
@@ -27,6 +27,7 @@ class CodeInspectorAgent:
 
         graph.add_node("fetch_pr", fetch_pr)
         graph.add_node("analyze", analyze)
+        graph.add_node("owasp_classify", owasp_classify)
         graph.add_node("reflect", reflect)
         graph.add_node("format_comment", format_comment)
         graph.add_node("post_comment", post_comment)
@@ -34,6 +35,7 @@ class CodeInspectorAgent:
         graph.add_edge(START, "fetch_pr")
         graph.add_edge("fetch_pr", "analyze")
         graph.add_conditional_edges("analyze", lambda state: "reflect" if state["findings"] else "format_comment")
+        graph.add_edge("analyze", "owasp_classify")
         graph.add_conditional_edges("reflect", 
                                     lambda s: (
                                                     "analyze"

@@ -12,6 +12,10 @@ from agent.nodes import fetch_pr, analyze, reflect, format_comment, post_comment
 
 class CodeInspectorAgent:
 
+    _NODE_NAMES = {"fetch_pr", "analyze", "reflect", "format_comment", "post_comment"}
+
+
+
 
     def _create_agent(self, checkpointer: BaseCheckpointSaver):
         """
@@ -42,6 +46,8 @@ class CodeInspectorAgent:
         return graph.compile(checkpointer)
 
 
+
+
     async def run(self, pr_url: str, config: dict):
         """
         Public method to run the agent with a given PR URL and configuration.
@@ -49,10 +55,12 @@ class CodeInspectorAgent:
         """
         async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
             compiled = self._create_agent(checkpointer)
-            return await compiled.ainvoke({"pr_url": pr_url}, config)
+            #return await compiled.ainvoke({"pr_url": pr_url}, config)
+            async for update in compiled.astream({"pr_url": pr_url}, config):
+                print(update)
         
 
-    _NODE_NAMES = {"fetch_pr", "analyze", "reflect", "format_comment", "post_comment"}
+
 
     async def stream_events(self, pr_url: str, config: dict):
         """
@@ -62,10 +70,12 @@ class CodeInspectorAgent:
         """
         async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
             compiled = self._create_agent(checkpointer)
+
             async for chunk in compiled.astream({"pr_url": pr_url}, config):
                 for node_name in chunk:
                     if node_name in self._NODE_NAMES:
                         yield {"node": node_name, "status": "completed"}
+
             snapshot = await compiled.aget_state(config)
             values = snapshot.values
             yield {
@@ -73,19 +83,6 @@ class CodeInspectorAgent:
                 "findings": values.get("findings", []),
                 "comment_body": values.get("comment_body", ""),
             }
-
-
-    async def resume(self, decision: Literal["approved", "rejected"], config: dict) -> dict | None:
-        """
-        Resume the agent after an interrupt with the user's decision.
-        """
-        async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
-            compiled = self._create_agent(checkpointer)
-            
-            if decision == "approved":
-                return await compiled.ainvoke(None, config)
-            else:
-                return None
 
 
 

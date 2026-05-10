@@ -23,6 +23,7 @@ class AgentState(TypedDict):
 
     cve_data: list[dict]        # populated by osv_lookup
     owasp_mappings: list[dict]  # populated by owasp_classify
+    orphan_cves: list[dict]     # CVEs with no matching finding
 
     # LLM conversation history (auto-merges via reducer)
     messages: Annotated[list, add_messages]

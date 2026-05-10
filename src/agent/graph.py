@@ -4,7 +4,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from agent.models import AgentState
-from agent.nodes import fetch_pr, analyze, reflect, format_comment, post_comment, owasp_classify, osv_lookup
+from agent.nodes import fetch_pr, analyze, reflect, format_comment, post_comment, owasp_classify, osv_lookup, consolidate_findings
 
 
 class CodeInspectorAgent:
@@ -26,6 +26,7 @@ class CodeInspectorAgent:
         graph.add_node("analyze", analyze)
         graph.add_node("owasp_classify", owasp_classify)
         graph.add_node("osv_lookup", osv_lookup)
+        graph.add_node("consolidate_findings", consolidate_findings)
         graph.add_node("reflect", reflect)
         graph.add_node("format_comment", format_comment)
         graph.add_node("post_comment", post_comment)
@@ -33,8 +34,9 @@ class CodeInspectorAgent:
         graph.add_edge(START, "fetch_pr")
         graph.add_edge("fetch_pr", "analyze")
         graph.add_conditional_edges("analyze", lambda state: ["owasp_classify", "osv_lookup"] if state["findings"] else "format_comment")
-        graph.add_edge("owasp_classify", "reflect")
-        graph.add_edge("osv_lookup", "reflect")
+        graph.add_edge("owasp_classify", "consolidate_findings")
+        graph.add_edge("osv_lookup", "consolidate_findings")
+        graph.add_edge("consolidate_findings", "reflect")
         graph.add_conditional_edges("reflect",
                                     lambda s: (
                                                     "analyze"

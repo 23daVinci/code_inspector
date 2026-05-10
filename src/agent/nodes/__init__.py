@@ -5,3 +5,4 @@ from .format_comment import format_comment
 from .post_comment import post_comment
 from .owasp_classify import owasp_classify
 from .osv_lookup import osv_lookup
+from .consolidated_findings import consolidate_findings
